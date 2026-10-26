@@ -1,0 +1,4 @@
+{
+	"appService.defaultWebAppToDeploy": "/subscriptions/10bb68a7-fa35-4983-ab7e-410a10795d62/resourceGroups/Node/providers/Microsoft.Web/sites/bkend",
+	"appService.deploySubpath": "."
+}
