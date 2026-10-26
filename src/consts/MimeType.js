@@ -1,6 +1,5 @@
 //@ts-check
 
-
 //TODO deprecate
 
 // const MimeType = {

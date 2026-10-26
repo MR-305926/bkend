@@ -1,3 +1,4 @@
+//@ts-check
 
 /**
  * WARN: list may be incomplete
