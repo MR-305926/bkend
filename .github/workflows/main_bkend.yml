@@ -52,4 +52,4 @@ jobs:
           app-name: 'bkend'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B0B47101B360422797C6470B67851489 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_F0A37809588649989343E67A77414D36 }}
