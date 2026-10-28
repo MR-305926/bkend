@@ -49,7 +49,8 @@ const premiumRoutes = routesFor([UserRole.PREMIUM]);
 
 //WARN should be in a protected route
 //TODO move to protected route
-router.route(root + "/imageUpload").post(uploadImage);
+//TODO enable again, code is in place
+//router.route(root + "/imageUpload").post(uploadImage);
 
 router.route(root).all((req, res) => send(res, HttpStatus.OK));
 router.route(root + "/signUp").post(validateBody(signUpSchema), signUp);
