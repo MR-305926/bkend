@@ -12,6 +12,11 @@ import mainRouter from "./src/router/v1.router.js";
 import readEnv, { ENVKEY } from "./src/utils/readEnv.js";
 import send from "./src/utils/send.js";
 
+//WARN: hack because node is weird and needs handholding
+import dns from "node:dns/promises";
+//WARN: set dns to cloudfare's dns service
+dns.setServers(["1.1.1.1", "1.0.0.1"]);
+
 startServer(mainRouter);
 
 /**
