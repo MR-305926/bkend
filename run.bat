@@ -1,3 +1,3 @@
 :_main
-CLS & npm run run & PAUSE
+CLS & npm run dev & PAUSE
 GOTO _main
