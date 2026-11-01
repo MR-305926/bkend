@@ -1,6 +1,6 @@
 //@ts-check
 
-import express from "express";
+import express, { Router } from "express";
 import HttpStatus from "../consts/HttpStatus.js";
 import { add, get, remove } from "../controllers/entity.controller.js";
 import {
@@ -27,58 +27,139 @@ import allowRouterFor from "../middleware/allowRouterFor.middleware.js";
 import authorize from "../middleware/authorize.middleware.js";
 import validateBody from "../middleware/validateBody.middleware.js";
 import send from "../utils/send.js";
+import readEnv, { ENVKEY } from "../utils/readEnv.js";
+import { requestMetaGet, RequestMetaKey } from "../services/requestMeta.service.js";
 
 const router = express.Router();
 const root = "/1";
 
+/**@typedef {{(allowedRoles:readonly UserRole[],paths:SmartRoutes):SmartRouter}} SmartRouter */
+/**@typedef {{[label:string]:SmartRoute}} SmartRoutes */
+/**@typedef {{path:string,handlers:import("express").RequestHandler[]}} SmartRoute */
 /**
- * @param {UserRole[]} [allowedRoles]
+ * @param {import("express").Router} router
+ * @param {string} rootPath
+ * @param {SmartRoutes} nonAuthPaths
  */
-function routesFor(allowedRoles) {
-	if (allowedRoles == undefined || allowedRoles.length < 1) {
-		allowedRoles = [...UserRoles];
+function routing(router, rootPath, nonAuthPaths) {
+	let cors_origin = readEnv(ENVKEY.cors_origin);
+
+	router.route(root).all((req, res) => send(res, HttpStatus.OK));
+
+	{
+		/** @type {{label:string,path:string}[]} */
+		let nonAuthActualPaths = [];
+		let entriesNonAuthPaths = Object.entries(nonAuthPaths);
+		let pathBuffer;
+		for (let [k, v] of entriesNonAuthPaths) {
+			pathBuffer = rootPath + v.path;
+			nonAuthActualPaths.push({ label: k, path: pathBuffer });
+			router.route(pathBuffer).post(v.handlers);
+		}
+		router.route(root).all((req, res) => res.status(HttpStatus.OK).send(nonAuthActualPaths));
 	}
-	return express.Router().use(authorize, allowRouterFor(allowedRoles));
+
+	/** @type {{[k:UserRole]:{label:string,path:string}[]}} */
+	let roleRoutesMap = Object();
+
+	{
+		/**
+		 * @type {import("express").RequestHandler}
+		 * @returns {void}
+		 */
+		function indexRequestHandler(req, res) {
+			let role = requestMetaGet(req, RequestMetaKey.session_role);
+			let pathIndex = (role == undefined) ? [] : roleRoutesMap[role];
+			res.status(HttpStatus.OK).send(pathIndex);
+		}
+		router.route(rootPath + "/index").post(authorize, indexRequestHandler);
+	}
+
+	/** @type {SmartRouter} */
+	function SmartRouterInstance(allowedRoles, paths) {
+		let branchRouter = express.Router().use(authorize, allowRouterFor(allowedRoles));
+		{
+			/** @type {{label:string,path:string}[]} */
+			let actualPaths = [];
+			{
+				let pathBuffer;
+				for (let [k, v] of Object.entries(paths)) {
+					pathBuffer = rootPath + v.path;
+					branchRouter.route(pathBuffer).post(v.handlers);
+					actualPaths.push({ label: k, path: (cors_origin + pathBuffer) });
+				}
+			}
+			{
+				//TODO check if by ref of buffer holds up
+				/** @type {{label:string,path:string}[]} */
+				let buffer;
+				for (let item of allowedRoles) {
+					buffer = roleRoutesMap[item];
+					if (buffer == undefined) {
+						buffer = [];
+						roleRoutesMap[item] = buffer;
+					}
+					for (let x of actualPaths) {
+						buffer.push(x);
+					}
+				}
+			}
+			router.use(branchRouter);
+		}
+		return SmartRouterInstance;
+	}
+	return SmartRouterInstance;
 }
 
-const publicRoutes = routesFor([]);
-const adminRoutes = routesFor([UserRole.ADMIN]);
-const readerRoutes = routesFor([UserRole.READER, UserRole.PREMIUM]);
-const nonpremiumRoutes = routesFor([UserRole.READER]);
-const premiumRoutes = routesFor([UserRole.PREMIUM]);
+/**
+ * @param {string} path
+ * @param {import("express").RequestHandler[]} handlers
+ */
+function route(path, ...handlers) {
+	return { path, handlers }
+}
 
 //WARN should be in a protected route
 //TODO move to protected route
 //TODO enable again, code is in place
 //router.route(root + "/imageUpload").post(uploadImage);
 
-router.route(root).all((req, res) => send(res, HttpStatus.OK));
-router.route(root + "/signUp").post(validateBody(signUpSchema), signUp);
-router.route(root + "/login").post(validateBody(loginSchema), login);
 
-publicRoutes.route(root + "/changeMyPassword").post(changeMyPassword);
-publicRoutes.route(root + "/deleteMyAccount").post(deleteMyAccount);
-publicRoutes.route(root + "/upgradeMyAccount").post(upgradeMyAccount);
-publicRoutes.route(root + "/bookGet").post(get(Book));
-router.use(publicRoutes);
+routing(router, root,
+	{
+		"Registrarse": route("/signUp", validateBody(signUpSchema), signUp),
+		"Ingresar": route("/login", validateBody(loginSchema), login)
+	}
+)(
+	UserRoles, {
+	"Cambiar mi contraseña": route("/changeMyPassword", changeMyPassword),
+	"Eliminar mi cuenta": route("/deleteMyAccount", deleteMyAccount),
+	"Mejorar mi plan": route("/upgradeMyAccount", upgradeMyAccount),
+	"Buscar libro": route("/bookGet", get(Book))
+}
+)([UserRole.READER, UserRole.PREMIUM],
+	{
+		"Buscar marcador de pagina": route("/pagemarkerGet", getMyPagemarker),
+		"Actualizar marcador de pagina": route("/pagemarkerUpdate", updateMyPagemarker),
+		"Eliminar marcador de pagina": route("/pagemarkerRemove", removeMyPagemarker)
+	}
+)([UserRole.READER],
+	{
+		"Añadir marcador de pagina": route("/pagemarkerAdd", addMyPagemarkerRestricted)
+	}
+)([UserRole.PREMIUM],
+	{
+		"Añadir marcador de pagina": route("/pagemarkerAdd", addMyPagemarker)
+	}
+)([UserRole.ADMIN],
+	{
+		"Añadir libro": route("/bookAdd", add(Book)),
+		"Eliminar libro": route("/bookRemove", remove(Book)),
+		"Añadir genero libro": route("/bookgenreAdd", add(Bookgenre)),
+		"Eliminar genero libro": route("/bookgenreRemove", remove(Bookgenre)),
+	}
+);
 
-readerRoutes.route(root + "/pagemarkerGet").post(getMyPagemarker);
-readerRoutes.route(root + "/pagemarkerUpdate").post(updateMyPagemarker);
-readerRoutes.route(root + "/pagemarkerRemove").post(removeMyPagemarker);
-router.use(readerRoutes);
-
-nonpremiumRoutes.route(root + "/pagemarkerAdd").post(addMyPagemarkerRestricted);
-router.use(nonpremiumRoutes);
-
-premiumRoutes.route(root + "/pagemarkerAdd").post(addMyPagemarker);
-router.use(premiumRoutes);
-
-adminRoutes.route(root + "/bookAdd").post(add(Book));
-adminRoutes.route(root + "/bookRemove").post(remove(Book));
-adminRoutes.route(root + "/bookgenreAdd").post(add(Bookgenre));
-adminRoutes.route(root + "/bookgenreRemove").post(remove(Bookgenre));
-router.use(adminRoutes);
-
-router.route("/*plsignore").all((req, res) => send(res, HttpStatus.NOT_FOUND));
+router.all(root + "/:a", (req, res) => send(res, HttpStatus.NOT_FOUND));
 
 export default router;

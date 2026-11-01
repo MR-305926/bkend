@@ -3,7 +3,7 @@
 import { requestMetaGet, RequestMetaKey } from "../services/requestMeta.service.js";
 
 /**
- * @param {import("../entities/Credential.js").UserRole[]} allowedRoles
+ * @param {import("../entities/Credential.js").UserRole[]|readonly import("../entities/Credential.js").UserRole[]} allowedRoles
  */
 function allowRouteFor(allowedRoles) {
 	/** 
