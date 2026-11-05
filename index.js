@@ -125,6 +125,7 @@ function startExpress(corsConfig, routers) {
 	let app = express().
 		use(cors(corsConfig)).
 		use(express.json()).
+		use(express.static("./static")).
 		use(handleMiddlewareException);
 	for (let router of routers) {
 		app = app.use(router);
