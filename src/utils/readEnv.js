@@ -13,7 +13,7 @@ function readEnv(key) {
  * @enum {string}
  */
 const ENVKEY = {
-	port: "PORT",
+	port: "SERVER_PORT",
 	jwtsecret: "jwtsecret",
 	cors_origin: "cors_origin",
 	connectionString: "connectionString",
