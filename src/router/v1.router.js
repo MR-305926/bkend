@@ -73,7 +73,7 @@ function routing(router, rootPath, nonAuthPaths) {
 			res.status(HttpStatus.OK).send(pathIndex);
 		}
 		router.route(rootPath + "/index").post(authorize, indexRequestHandler);
-		router.route("/health").all((req, res) => res.status(200).send().end())
+		router.route(rootPath + "/health").all((req, res) => res.status(200).send().end())
 	}
 
 	/** @type {SmartRouter} */
