@@ -1,6 +1,6 @@
 //@ts-check
 
-import express, { Router } from "express";
+import express, { raw, Router } from "express";
 import HttpStatus from "../consts/HttpStatus.js";
 import { add, get, remove } from "../controllers/entity.controller.js";
 import {
@@ -29,13 +29,37 @@ import validateBody from "../middleware/validateBody.middleware.js";
 import send from "../utils/send.js";
 import readEnv, { ENVKEY } from "../utils/readEnv.js";
 import { requestMetaGet, RequestMetaKey } from "../services/requestMeta.service.js";
+import Joi from "joi";
 
 const router = express.Router();
 const root = "/1";
 
+/**
+ * @param {FormSchema} rawSchema
+ * @returns {import("joi").ObjectSchema}
+ */
+function parseSchema(rawSchema) {
+	let fieldSchema;
+	let partialSchema = Object({});
+	for (let [name, constraints] of Object.entries(rawSchema)) {
+		//WARN magic read
+		// @ts-ignore
+		fieldSchema = Joi.types()[constraints.type];
+		for (let [rule, param] of Object.entries(constraints.rules)) {
+			if (param != null) {
+				fieldSchema = fieldSchema[rule](param);
+			} else {
+				fieldSchema = fieldSchema[rule]();
+			}
+		}
+		partialSchema[name] = fieldSchema;
+	}
+	return Joi.object(partialSchema);
+}
+
 /**@typedef {{(allowedRoles:readonly UserRole[],paths:SmartRoutes):SmartRouter}} SmartRouter */
 /**@typedef {{[label:string]:SmartRoute}} SmartRoutes */
-/**@typedef {{path:string,handlers:import("express").RequestHandler[]}} SmartRoute */
+/**@typedef {{path:string,schema:FormSchema|undefined,handlers:import("express").RequestHandler[]}} SmartRoute */
 /**
  * @param {import("express").Router} router
  * @param {string} rootPath
@@ -59,7 +83,7 @@ function routing(router, rootPath, nonAuthPaths) {
 		router.route(root).all((req, res) => res.status(HttpStatus.OK).send(nonAuthActualPaths));
 	}
 
-	/** @type {{[k:UserRole]:{label:string,innerPath:string,path:string}[]}} */
+	/** @type {{[k:UserRole]:{label:string,innerPath:string,schema:FormSchema|undefined,path:string}[]}} */
 	let roleRoutesMap = Object();
 
 	{
@@ -80,19 +104,27 @@ function routing(router, rootPath, nonAuthPaths) {
 	function SmartRouterInstance(allowedRoles, paths) {
 		let branchRouter = express.Router().use(authorize, allowRouterFor(allowedRoles));
 		{
-			/** @type {{label:string,innerPath:string,path:string}[]} */
+			/** @type {{label:string,innerPath:string,schema:FormSchema|undefined,path:string}[]} */
 			let actualPaths = [];
 			{
 				let pathBuffer;
+				let joiSchema;
+				let validator;
 				for (let [k, v] of Object.entries(paths)) {
 					pathBuffer = rootPath + v.path;
-					branchRouter.route(pathBuffer).post(v.handlers);
-					actualPaths.push({ label: k, innerPath: v.path, path: (cors_origin + pathBuffer) });
+					if (v.schema != undefined) {
+						joiSchema = parseSchema(v.schema);
+						validator = validateBody(joiSchema);
+						branchRouter.route(pathBuffer).post([validator].concat(v.handlers));
+					} else {
+						branchRouter.route(pathBuffer).post(v.handlers);
+					}
+					actualPaths.push({ label: k, innerPath: v.path, schema: v.schema, path: (cors_origin + pathBuffer) });
 				}
 			}
 			{
 				//TODO check if by ref of buffer holds up
-				/** @type {{label:string,innerPath:string,path:string}[]} */
+				/** @type {{label:string,innerPath:string,schema:FormSchema|undefined,path:string}[]} */
 				let buffer;
 				for (let item of allowedRoles) {
 					buffer = roleRoutesMap[item];
@@ -112,12 +144,14 @@ function routing(router, rootPath, nonAuthPaths) {
 	return SmartRouterInstance;
 }
 
+/**@typedef {{[name:string]:{alias:string,type:string,rules:{[k:string]:any}}}} FormSchema */
 /**
  * @param {string} path
+ * @param {FormSchema} schema
  * @param {import("express").RequestHandler[]} handlers
  */
-function route(path, ...handlers) {
-	return { path, handlers }
+function route(path, schema, ...handlers) {
+	return { path, schema, handlers }
 }
 
 //WARN should be in a protected route
@@ -128,36 +162,38 @@ function route(path, ...handlers) {
 
 routing(router, root,
 	{
-		"Registrarse": route("/signUp", validateBody(signUpSchema), signUp),
-		"Ingresar": route("/login", validateBody(loginSchema), login)
+		"Registrarse": route("/signUp", {}, validateBody(signUpSchema), signUp),
+		"Ingresar": route("/login", {}, validateBody(loginSchema), login)
 	}
 )(
 	UserRoles, {
-	"Cambiar mi contraseña": route("/changeMyPassword", changeMyPassword),
-	"Eliminar mi cuenta": route("/deleteMyAccount", deleteMyAccount),
-	"Mejorar mi plan": route("/upgradeMyAccount", upgradeMyAccount),
-	"Buscar libro": route("/bookGet", get(Book))
+	"Cambiar mi contraseña": route("/changeMyPassword", {
+		"password": { alias: "contraseña", type: "string", rules: { "min": 1, "required": null } }
+	}, changeMyPassword),
+	"Eliminar mi cuenta": route("/deleteMyAccount", {}, deleteMyAccount),
+	"Mejorar mi plan": route("/upgradeMyAccount", {}, upgradeMyAccount),
+	"Buscar libro": route("/bookGet", {}, get(Book))
 }
 )([UserRole.READER, UserRole.PREMIUM],
 	{
-		"Buscar marcador de pagina": route("/pagemarkerGet", getMyPagemarker),
-		"Actualizar marcador de pagina": route("/pagemarkerUpdate", updateMyPagemarker),
-		"Eliminar marcador de pagina": route("/pagemarkerRemove", removeMyPagemarker)
+		"Buscar marcador de pagina": route("/pagemarkerGet", {}, getMyPagemarker),
+		"Actualizar marcador de pagina": route("/pagemarkerUpdate", {}, updateMyPagemarker),
+		"Eliminar marcador de pagina": route("/pagemarkerRemove", {}, removeMyPagemarker)
 	}
 )([UserRole.READER],
 	{
-		"Añadir marcador de pagina": route("/pagemarkerAdd", addMyPagemarkerRestricted)
+		"Añadir marcador de pagina": route("/pagemarkerAdd", {}, addMyPagemarkerRestricted)
 	}
 )([UserRole.PREMIUM],
 	{
-		"Añadir marcador de pagina": route("/pagemarkerAdd", addMyPagemarker)
+		"Añadir marcador de pagina": route("/pagemarkerAdd", {}, addMyPagemarker)
 	}
 )([UserRole.ADMIN],
 	{
-		"Añadir libro": route("/bookAdd", add(Book)),
-		"Eliminar libro": route("/bookRemove", remove(Book)),
-		"Añadir genero libro": route("/bookgenreAdd", add(Bookgenre)),
-		"Eliminar genero libro": route("/bookgenreRemove", remove(Bookgenre)),
+		"Añadir libro": route("/bookAdd", {}, add(Book)),
+		"Eliminar libro": route("/bookRemove", {}, remove(Book)),
+		"Añadir genero libro": route("/bookgenreAdd", {}, add(Bookgenre)),
+		"Eliminar genero libro": route("/bookgenreRemove", {}, remove(Bookgenre)),
 	}
 );
 
