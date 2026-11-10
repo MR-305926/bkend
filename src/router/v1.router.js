@@ -59,7 +59,7 @@ function routing(router, rootPath, nonAuthPaths) {
 		router.route(root).all((req, res) => res.status(HttpStatus.OK).send(nonAuthActualPaths));
 	}
 
-	/** @type {{[k:UserRole]:{label:string,path:string}[]}} */
+	/** @type {{[k:UserRole]:{label:string,innerPath:string,path:string}[]}} */
 	let roleRoutesMap = Object();
 
 	{
@@ -80,19 +80,19 @@ function routing(router, rootPath, nonAuthPaths) {
 	function SmartRouterInstance(allowedRoles, paths) {
 		let branchRouter = express.Router().use(authorize, allowRouterFor(allowedRoles));
 		{
-			/** @type {{label:string,path:string}[]} */
+			/** @type {{label:string,innerPath:string,path:string}[]} */
 			let actualPaths = [];
 			{
 				let pathBuffer;
 				for (let [k, v] of Object.entries(paths)) {
 					pathBuffer = rootPath + v.path;
 					branchRouter.route(pathBuffer).post(v.handlers);
-					actualPaths.push({ label: k, path: (cors_origin + pathBuffer) });
+					actualPaths.push({ label: k, innerPath: v.path, path: (cors_origin + pathBuffer) });
 				}
 			}
 			{
 				//TODO check if by ref of buffer holds up
-				/** @type {{label:string,path:string}[]} */
+				/** @type {{label:string,innerPath:string,path:string}[]} */
 				let buffer;
 				for (let item of allowedRoles) {
 					buffer = roleRoutesMap[item];
