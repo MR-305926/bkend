@@ -71,7 +71,7 @@ function genMongoModel(name, schema, keys, keySets) {
 		for (let k of Object.keys(item)) {
 			if (!keys.includes(k)) throw new Error("invalid keyset");
 		}
-		mongooseSchema.index(item);
+		mongooseSchema.index(item, { unique: true });
 	}
 
 	return mongoose.model(name, mongooseSchema, name);
@@ -215,7 +215,7 @@ function genInsertSchema(schema, keySets) {
 		let uniqueConstraints = [];
 		for (let item of keySets) {
 			uniqueConstraints.push((a, b) => {
-				for (let k of Object.keys(keySets)) {
+				for (let k of Object.keys(item)) {
 					if (a[k] != b[k]) return false;
 				}
 				return true;
