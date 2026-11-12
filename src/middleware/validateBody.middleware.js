@@ -14,7 +14,8 @@ function validateBody(joiSchema) {
 	 * @returns {void}
 	 */
 	return function (req, res, next) {
-		let state = joiSchema.validate(req.body);
+		//WARN allowed unknowns because unknown but valid values are ignored, according to stack overflow
+		let state = joiSchema.validate(req.body, { allowUnknown: true });
 		if (state.error == undefined) {
 			requestMetaAdd(req, RequestMetaKey.state, state);
 			next();
