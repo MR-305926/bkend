@@ -29,33 +29,9 @@ import validateBody from "../middleware/validateBody.middleware.js";
 import send from "../utils/send.js";
 import readEnv, { ENVKEY } from "../utils/readEnv.js";
 import { requestMetaGet, RequestMetaKey } from "../services/requestMeta.service.js";
-import Joi from "joi";
 
 const router = express.Router();
 const root = "/1";
-
-/**
- * @param {FormSchema} rawSchema
- * @returns {import("joi").ObjectSchema}
- */
-function parseSchema(rawSchema) {
-	let fieldSchema;
-	let partialSchema = Object({});
-	for (let [name, constraints] of Object.entries(rawSchema)) {
-		//WARN magic read
-		// @ts-ignore
-		fieldSchema = Joi.types()[constraints.type];
-		for (let [rule, param] of Object.entries(constraints.rules)) {
-			if (param != null) {
-				fieldSchema = fieldSchema[rule](param);
-			} else {
-				fieldSchema = fieldSchema[rule]();
-			}
-		}
-		partialSchema[name] = fieldSchema;
-	}
-	return Joi.object(partialSchema);
-}
 
 /**@typedef {{(allowedRoles:readonly UserRole[],paths:SmartRoutes):SmartRouter}} SmartRouter */
 /**@typedef {{[label:string]:SmartRoute}} SmartRoutes */
@@ -108,14 +84,10 @@ function routing(router, rootPath, nonAuthPaths) {
 			let actualPaths = [];
 			{
 				let pathBuffer;
-				let joiSchema;
-				let validator;
 				for (let [k, v] of Object.entries(paths)) {
 					pathBuffer = rootPath + v.path;
 					if (v.schema != undefined) {
-						joiSchema = parseSchema(v.schema);
-						validator = validateBody(joiSchema);
-						branchRouter.route(pathBuffer).post([validator].concat(v.handlers));
+						branchRouter.route(pathBuffer).post(v.handlers);
 					} else {
 						branchRouter.route(pathBuffer).post(v.handlers);
 					}
