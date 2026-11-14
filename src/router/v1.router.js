@@ -87,6 +87,7 @@ function routing(router, rootPath, nonAuthPaths) {
 				for (let [k, v] of Object.entries(paths)) {
 					pathBuffer = rootPath + v.path;
 					actualPaths.push({ label: k, innerPath: v.path, path: (cors_origin + pathBuffer) });
+					branchRouter.route(pathBuffer).post(v.handlers);
 				}
 			}
 			{

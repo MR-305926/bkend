@@ -14,9 +14,7 @@ function allowRouteFor(allowedRoles) {
 		let role = requestMetaGet(req, RequestMetaKey.session_role);
 		if ((role != undefined) && (allowedRoles.includes(role))) {
 			next();
-			return;
 		}
-		next('router');
 	}
 }
 
