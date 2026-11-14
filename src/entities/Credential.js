@@ -29,5 +29,5 @@ const Credential = mongoose.model(
 );
 
 export default Credential;
-export { UserRole, roles as UserRoles };
+export { UserRole, roles as AllUserRoles };
 

@@ -23,7 +23,7 @@ startServer(mainRouter);
  * @param {string} message 
  */
 function log(message) {
-	console.log(`[${readEnv(ENVKEY.cors_origin) ?? "SERVER"}]: ${message}`);
+	console.log(`[${readEnv(ENVKEY.cors_origin) ?? "SERVER"}][${readEnv(ENVKEY.port)}]: ${message}`);
 }
 
 /**

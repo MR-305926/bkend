@@ -22,7 +22,7 @@ import {
 } from "../controllers/session.controller.js";
 import Book from "../entities/Book.js";
 import Bookgenre from "../entities/BookGenre.js";
-import { UserRole, UserRoles } from "../entities/Credential.js";
+import { UserRole, AllUserRoles } from "../entities/Credential.js";
 import allowRouterFor from "../middleware/allowRouterFor.middleware.js";
 import authorize from "../middleware/authorize.middleware.js";
 import validateBody from "../middleware/validateBody.middleware.js";
@@ -132,12 +132,12 @@ routing(router, root,
 		"Registrarse": route("/signUp", validateBody(signUpSchema), signUp),
 		"Ingresar": route("/login", validateBody(loginSchema), login)
 	}
-)(
-	UserRoles, {
-	"Cambiar mi contraseña": route("/changeMyPassword", changeMyPassword),
-	"Eliminar mi cuenta": route("/deleteMyAccount", deleteMyAccount),
-	"Buscar libro": route("/bookGet", get(Book))
-}
+)(AllUserRoles,
+	{
+		"Cambiar mi contraseña": route("/changeMyPassword", changeMyPassword),
+		"Eliminar mi cuenta": route("/deleteMyAccount", deleteMyAccount),
+		"Buscar libro": route("/bookGet", get(Book))
+	}
 )([UserRole.READER, UserRole.PREMIUM],
 	{
 		"Buscar marcador de pagina": route("/pagemarkerGet", getMyPagemarker),
