@@ -21,7 +21,7 @@ import {
 	upgradeMyAccount
 } from "../controllers/session.controller.js";
 import Book from "../entities/Book.js";
-import Bookgenre from "../entities/BookGenre.js";
+import Bookgenre from "../entities/Bookgenre.js";
 import { UserRole, AllUserRoles } from "../entities/Credential.js";
 import allowRouterFor from "../middleware/allowRouterFor.middleware.js";
 import authorize from "../middleware/authorize.middleware.js";
